@@ -13,9 +13,6 @@ cdef extern from "<algorithm>" namespace "std" nogil:
                                                           InputIter2 first2, InputIter2 last2,
                                                           OutputIter result)
 
-# from sortednp import merge
-
-# from libcpp cimport bool
 cimport cython
 
 import numpy as np
@@ -155,12 +152,6 @@ cpdef files_to_bin_counts(files, args):
             else:
                 v2 = sum_tags[chromosome, strand]
                 sum_tags[chromosome, strand] = v.merge(v2)
-
-
-    # sys.stderr.write("\nMerging bins from all files\n")
-    # sys.stderr.flush()
-    # for key, value in sum_tags.items():
-    #     sum_tags[key] = np.sort(np.concatenate(value), kind="mergesort")
 
     sys.stderr.write("\nCounting the number of reads in each bin\n\n")
     sys.stderr.flush()

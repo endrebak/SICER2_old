@@ -6,11 +6,42 @@ from sys import argv
 
 
 from SICER2.src.reads_to_bins import files_to_bin_counts
+from SICER2.src.statistics import compute_background_probabilities
 
 
 args = {"bin_size": 200, "fragment_size": 150, "drop_duplicates": True}
 
+hg19 = sum([['chr1', '249250621'],
+            ['chr2', '243199373'],
+            ['chr3', '198022430'],
+            ['chr4', '191154276'],
+            ['chr5', '180915260'],
+            ['chr6', '171115067'],
+            ['chr7', '159138663'],
+            ['chrX', '155270560'],
+            ['chr8', '146364022'],
+            ['chr9', '141213431'],
+            ['chr10', '135534747'],
+            ['chr11', '135006516'],
+            ['chr12', '133851895'],
+            ['chr13', '115169878'],
+            ['chr14', '107349540'],
+            ['chr15', '102531392'],
+            ['chr16', '90354753'],
+            ['chr17', '81195210'],
+            ['chr18', '78077248'],
+            ['chr20', '63025520'],
+            ['chrY', '59373566'],
+            ['chr19', '59128983'],
+            ['chr22', '51304566'],
+            ['chr21', '48129895'],
+            ['chrM', '16571']], [])
 
+
+
+print(hg19)
+hg19 = {hg19[i]: int(hg19[i + 1]) for i in range(0, len(hg19), 2)}
+print(hg19)
 
 from collections import OrderedDict
 import argparse
@@ -67,7 +98,7 @@ parser.add_argument(
     '--drop-duplicates',
     '-d',
     required=False,
-    default=False,
+    default=True,
     action='store_true',
     help=
     '''Keep reads mapping to the same position on the same strand within a library. Default is to remove all but the first duplicate.
@@ -117,6 +148,7 @@ parser.add_argument(
     '--effective-genome-fraction',
     '-egf',
     required=False,
+    default=0.74,
     type=float,
     help=
     '''Use a different effective genome fraction than the one included in epic. The default value depends on the genome and readlength, but is a number between 0 and 1.''')
@@ -134,16 +166,18 @@ parser.add_argument(
 def main():
 
     args = vars(parser.parse_args())
-
+    print(args["effective_genome_fraction"])
+    args["effective_genome_size"] = sum(hg19.values()) * args["effective_genome_fraction"]
+    print("Genome length:", sum(hg19.values()))
     c_bins_counts = files_to_bin_counts(args["treatment"], args)
     t_bins_counts = files_to_bin_counts(args["control"], args)
 
     # need to remove bad chromos here
 
-    chip_count = sum(len(v) for v in c_bins_counts.values())
-    background_count = sum(len(v) for v in t_bins_counts.values())
+    chip_count = sum(sum(counts) for _, counts in c_bins_counts.values())
+    background_count = sum(sum(counts) for _, counts in t_bins_counts.values())
 
-    # score_threshold, island_enriched_threshold, average_window_readcount = compute_background_probabilities(
-    #     total_chip_count, args["bin_size"], args["effective_genome_size"], args["gaps_allowed"])
+    score_threshold, island_enriched_threshold, average_window_readcount = compute_background_probabilities(
+        9904, args["bin_size"], 2321499335, args["gaps_allowed"])
 
 main()
