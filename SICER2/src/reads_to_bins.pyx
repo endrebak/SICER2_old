@@ -8,9 +8,15 @@ from libcpp.algorithm cimport unique
 from libcpp.vector cimport vector
 from libcpp.string cimport string
 
+cdef extern from "<algorithm>" namespace "std" nogil:
+    OutputIter merge[InputIter1, InputIter2, OutputIter] (InputIter1 first1, InputIter1 last1,
+                                                          InputIter2 first2, InputIter2 last2,
+                                                          OutputIter result)
+
+# from sortednp import merge
+
 # from libcpp cimport bool
 cimport cython
-
 
 import numpy as np
 
@@ -22,9 +28,9 @@ cpdef count_reads_per_bin(tags):
     cdef:
         long[::1] bins
         long[::1] counts
-        long[::1] v
+        Vector v
         int i
-        int last
+        int last = -1
         int current
         int count = 0
         int nparsed
@@ -42,7 +48,7 @@ cpdef count_reads_per_bin(tags):
             last = bins[0]
 
         for i in range(len(v)):
-            current = v[i]
+            current = v.wrapped_vector[i]
 
             if current != last:
                 bins[nparsed] = current
@@ -53,9 +59,10 @@ cpdef count_reads_per_bin(tags):
             else:
                 count += 1
 
-        bins_counts[k] = (bins[:nparsed], counts[:nparsed])
+        bins_counts[k] = (bin_arr[:nparsed], count_arr[:nparsed])
 
     return bins_counts
+
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -86,18 +93,30 @@ cdef class Vector:
         # slow, only implemented to ease testing
         return (v for v in self.wrapped_vector)
 
+    def merge(self, Vector other):
+
+        cdef vector[int] o = vector[int](len(self) + len(other))
+        merge(self.wrapped_vector.begin(), self.wrapped_vector.end(),
+              other.wrapped_vector.begin(), other.wrapped_vector.end(),
+              o.begin())
+
+        cdef Vector output = Vector()
+        output.wrapped_vector = o
+
+        return output
 
 
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.initializedcheck(False)
-cpdef files_to_bins(files, args):
+cpdef files_to_bin_counts(files, args):
 
     cdef:
         int bin_size = args["bin_size"]
         int half_fragment_size = args["fragment_size"] / 2
         Vector v
+        Vector v2
         cdef long[::1] bin_arr
         cdef int i
 
@@ -128,17 +147,20 @@ cpdef files_to_bins(files, args):
                 for i in range(len(v)):
                     v.wrapped_vector[i] = v.wrapped_vector[i] - half_fragment_size
 
-            arr = np.zeros(len(v), dtype=int)
-            bin_arr = arr
             for i in range(len(v)):
-                bin_arr[i] = v.wrapped_vector[i] - (v.wrapped_vector[i] % bin_size)
+                v.wrapped_vector[i] = v.wrapped_vector[i] - (v.wrapped_vector[i] % bin_size)
 
-            sum_tags[chromosome, strand].append(arr)
+            if i == 0 or (chromosome, strand) not in sum_tags:
+                sum_tags[chromosome, strand] = v
+            else:
+                v2 = sum_tags[chromosome, strand]
+                sum_tags[chromosome, strand] = v.merge(v2)
 
-    sys.stderr.write("\nMerging bins from all files\n")
-    sys.stderr.flush()
-    for key, value in sum_tags.items():
-        sum_tags[key] = np.sort(np.concatenate(value), kind="mergesort")
+
+    # sys.stderr.write("\nMerging bins from all files\n")
+    # sys.stderr.flush()
+    # for key, value in sum_tags.items():
+    #     sum_tags[key] = np.sort(np.concatenate(value), kind="mergesort")
 
     sys.stderr.write("\nCounting the number of reads in each bin\n\n")
     sys.stderr.flush()
