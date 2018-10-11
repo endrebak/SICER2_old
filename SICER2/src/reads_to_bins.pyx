@@ -2,6 +2,9 @@ from collections import defaultdict
 import sys
 import numpy as np
 
+from libc.stdio cimport FILE, fopen, fwrite, fscanf, fclose, fseek, SEEK_END, ftell, stdout, stderr, EOF
+
+from cython.operator import dereference
 from libcpp.algorithm cimport sort as stdsort
 from libcpp.map cimport map as cppmap
 from libcpp.algorithm cimport unique
@@ -22,6 +25,7 @@ import numpy as np
 @cython.initializedcheck(False)
 cpdef count_reads_per_bin(tags):
 
+    # print("tags", tags)
     cdef:
         long[::1] bins
         long[::1] counts
@@ -31,24 +35,34 @@ cpdef count_reads_per_bin(tags):
         int current
         int count = 0
         int nparsed
+        int last_two_equal
 
     bins_counts = dict()
     for k, v in tags.items():
         nparsed = 0
+        count = 0
 
-        bin_arr = np.zeros(len(v), dtype=int)
+        # print(k)
+        bin_arr = np.ones(len(v), dtype=int) * -1
         bins = bin_arr
-        count_arr = np.zeros(len(v), dtype=int)
+        count_arr = np.ones(len(v), dtype=int)
         counts = count_arr
 
+        # print(v)
         if len(v) >= 1:
-            last = bins[0]
+            last = v.wrapped_vector[0]
+            # bins[0] = last
+            # counts[0] = 1
 
-        for i in range(len(v)):
+        for i in range(0, len(v)):
             current = v.wrapped_vector[i]
+            # print("current", current)
+            # print("last", last)
+            # print("count", count)
 
             if current != last:
-                bins[nparsed] = current
+                # print("adding", last, count)
+                bins[nparsed] = last
                 counts[nparsed] = count
                 last = current
                 count = 1
@@ -56,6 +70,23 @@ cpdef count_reads_per_bin(tags):
             else:
                 count += 1
 
+        # print("v", v)
+        # print(bin_arr)
+        # print(count_arr)
+        last_two_equal = v.wrapped_vector[len(v) - 2] == v.wrapped_vector[len(v) - 1]
+        if last_two_equal:
+            bins[nparsed] = v.wrapped_vector[len(v) - 1]
+            counts[nparsed] = count
+            nparsed += 1
+        else:
+            # print("else")
+            # print("adding", v.wrapped_vector[len(v) - 1], 1)
+            bins[nparsed] = v.wrapped_vector[len(v) - 1]
+            counts[nparsed] = 1
+            nparsed += 1
+
+        # print(bin_arr)
+        # print(count_arr)
         bins_counts[k] = (bin_arr[:nparsed], count_arr[:nparsed])
 
     return bins_counts
@@ -115,18 +146,18 @@ cpdef files_to_bin_counts(files, args):
         Vector v
         Vector v2
         cdef long[::1] bin_arr
-        cdef int i
 
 
     sum_tags = defaultdict(list)
     sys.stderr.write("Parsing file:\n")
     sys.stderr.flush()
-    for i, f in enumerate(files):
+    for f in files:
 
         sys.stderr.write("  " + f + "\n")
         sys.stderr.flush()
 
         tags = add_reads_to_dict(f)
+        # print("tags", tags)
 
         for v in tags.values():
             v.sort()
@@ -147,11 +178,11 @@ cpdef files_to_bin_counts(files, args):
             for i in range(len(v)):
                 v.wrapped_vector[i] = v.wrapped_vector[i] - (v.wrapped_vector[i] % bin_size)
 
-            if i == 0 or (chromosome, strand) not in sum_tags:
-                sum_tags[chromosome, strand] = v
+            if chromosome not in sum_tags:
+                sum_tags[chromosome] = v
             else:
-                v2 = sum_tags[chromosome, strand]
-                sum_tags[chromosome, strand] = v.merge(v2)
+                v2 = sum_tags[chromosome]
+                sum_tags[chromosome] = v.merge(v2)
 
     sys.stderr.write("\nCounting the number of reads in each bin\n\n")
     sys.stderr.flush()
@@ -159,6 +190,7 @@ cpdef files_to_bin_counts(files, args):
     bins_counts = count_reads_per_bin(sum_tags)
 
     return bins_counts
+
 
 
 cpdef add_reads_to_dict(f):
@@ -183,3 +215,47 @@ cpdef add_reads_to_dict(f):
             genome[chromosome, strand] = v
 
     return genome
+
+
+
+######## this was actually slower!
+
+# cpdef add_reads_to_dict(f):
+
+#     genome = dict()
+#     cdef:
+#         Vector v
+#         FILE *f_handle
+#         char chromosome [10]
+#         char strand [2]
+#         int left
+#         int right
+
+#     fp = fopen(f.encode(), "r")
+
+#     while (
+#             fscanf(fp, "%s\t%d\t%d\t%*s\t%*d\t%s\n", chromosome, &left, &right, strand) != EOF
+#     ):
+
+
+#         # print("----")
+#         # print("chromosome is", chromosome)
+#         # print("strand is", strand)
+#         # print("left is", left)
+#         # print("right is", right)
+#         if strand == b"+":
+#             five_end = left
+#         else:
+#             five_end = right
+
+#         # print("five end is ", five_end)
+
+#         if (chromosome, strand) in genome:
+#             v = genome[chromosome, strand]
+#             v.wrapped_vector.push_back(five_end)
+#         else:
+#             v = Vector()
+#             v.wrapped_vector.push_back(five_end)
+#             genome[chromosome, strand] = v
+
+#     return genome

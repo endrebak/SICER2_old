@@ -9,6 +9,8 @@ from Cython.Build import cythonize
 extensions = [Extension("SICER2.src.reads_to_bins",
                         ["SICER2/src/reads_to_bins.pyx"], language="c++"),
               Extension("SICER2.src.statistics",
-                        ["SICER2/src/statistics.pyx"], language="c++")]
+                        ["SICER2/src/statistics.pyx"], language="c++"),
+              Extension("SICER2.src.find_islands",
+                        ["SICER2/src/find_islands.pyx"], language="c++")]
 
 setup(ext_modules = cythonize(extensions, annotate=True))

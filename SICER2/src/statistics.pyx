@@ -4,7 +4,20 @@ from scipy.stats import poisson
 from numpy import log
 from itertools import count
 
-def compute_window_score(i, _poisson):
+from libc.math cimport log as clog
+from libc.math cimport round as cround
+
+try:
+    from functools import lru_cache
+except ImportError:
+    from functools32 import lru_cache
+
+
+@lru_cache()
+def compute_window_score(int i, _poisson):
+
+    cdef float window_score
+    cdef float p_value
 
     if i < _poisson.mean():
         return 0
@@ -19,11 +32,18 @@ def compute_window_score(i, _poisson):
 
     return window_score
 
+
 def generate_cumulative_distribution(vector[float] island_expectations):
 
-    l = island_expectations.size()
-    cumulative = np.zeros(l)
-    partial_sum = 0
+    cdef:
+        int i
+        int l = island_expectations.size()
+        double [::1] cumulative
+        float partial_sum = 0
+
+
+    cumulative_arr = np.zeros(l, dtype=float)
+    cumulative = cumulative_arr
 
     for i in range(1, l + 1):
 
@@ -37,14 +57,16 @@ def generate_cumulative_distribution(vector[float] island_expectations):
     return cumulative
 
 
-def update_island_expectations(vector[float] island_expectations, scaled_score, bin_size, average_window_readcount, island_enriched_threshold, gap_contribution):
+def update_island_expectations(vector[float] island_expectations, int scaled_score, int bin_size, float average_window_readcount, int island_enriched_threshold, float gap_contribution):
 
     cdef:
-
         float WINDOW_P_VALUE = 0.20
         float BIN_SIZE = 0.001
         int E_VALUE = 1000
         float E_VALUE_THRESHOLD = E_VALUE * .0000001
+        int i = island_enriched_threshold
+        float temp
+        int index
 
     _poisson = poisson(average_window_readcount)
     current_max_scaled_score = island_expectations.size() - 1
@@ -53,9 +75,8 @@ def update_island_expectations(vector[float] island_expectations, scaled_score, 
         for index in range(current_max_scaled_score + 1, scaled_score + 1):
             temp=0.0
 
-            i = island_enriched_threshold
 
-            current_island = int(round(index - compute_window_score(i, _poisson) / BIN_SIZE))
+            current_island = int(cround(index - compute_window_score(i, _poisson) / BIN_SIZE))
 
             while (current_island >= 0):
                 island_expectation = island_expectations[current_island]
@@ -65,7 +86,7 @@ def update_island_expectations(vector[float] island_expectations, scaled_score, 
                 if i == 500:
                     break
 
-                current_island = int(round(index - compute_window_score(i, _poisson) / BIN_SIZE))
+                current_island = int(cround(index - compute_window_score(i, _poisson) / BIN_SIZE))
 
                 temp *= gap_contribution
             island_expectations.push_back(temp)
@@ -88,6 +109,7 @@ def compute_score_threshold(average_window_readcount,
         int l
         int interval
         float partial_cumu
+        float e
 
         float WINDOW_P_VALUE = 0.20
         float BIN_SIZE = 0.001
@@ -133,7 +155,7 @@ def compute_score_threshold(average_window_readcount,
             partial_cumu = sum(island_expectations)
 
     cumulative = generate_cumulative_distribution(island_expectations)
-    print(list(cumulative))
+    # print(list(cumulative))
 
     score_threshold = 0
     for (i, e) in enumerate(cumulative):
