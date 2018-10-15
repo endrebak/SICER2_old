@@ -7,7 +7,7 @@ from sys import argv
 
 from SICER2.src.reads_to_bins import files_to_bin_counts
 from SICER2.src.statistics import compute_background_probabilities
-from SICER2.src.find_islands import find_islands
+from SICER2.src.find_islands import find_islands, compute_fdr
 
 
 args = {"bin_size": 200, "fragment_size": 150, "drop_duplicates": True}
@@ -168,20 +168,29 @@ def main():
 
     args = vars(parser.parse_args())
     args["effective_genome_size"] = sum(hg19.values()) * args["effective_genome_fraction"]
+    args["chromsizes"] = hg19
     c_bins_counts = files_to_bin_counts(args["treatment"], args)
-    t_bins_counts = files_to_bin_counts(args["control"], args)
-
-    find_islands(c_bins_counts, 5, 200, 7, 1)
-    # need to remove bad chromos here
-
-    # create bigwigs
-
     chip_count = sum(sum(counts) for _, counts in c_bins_counts.values())
-    background_count = sum(sum(counts) for _, counts in t_bins_counts.values())
 
     score_threshold, island_enriched_threshold, average_window_readcount = compute_background_probabilities(
         chip_count, args["bin_size"], args["effective_genome_size"], args["gaps_allowed"])
 
+    # print(average_window_readcount)
+    islands = find_islands(c_bins_counts, args["gaps_allowed"], args["bin_size"], score_threshold, island_enriched_threshold, average_window_readcount)
+    print(len(islands.keys()))
+
+    num_islands = 0
+    for k, v in islands.items():
+        num_islands += len(v)
+
+    print(num_islands)
+
+    if args["control"]:
+
+        b_bins_counts = files_to_bin_counts(args["control"], args)
+        background_count = sum(sum(counts) for _, counts in b_bins_counts.values())
+
+        fdr_corrected_islands = compute_fdr(islands, b_bins_counts, chip_count, background_count, args["effective_genome_size"])
 
 
 
