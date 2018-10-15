@@ -94,25 +94,26 @@ def find_islands(bins_counts, int gaps_allowed, int bin_size, float score_thresh
         # TODO: if chromo not in chromsizes, remove
         bins, counts = bins_counts[chromosome]
 
-        for i in range(len(bins)):
-            count = counts[i]
-            if count <= island_enriched_threshold:
-                j = i + 1
-                _bin = bins[i]
-                score = compute_window_score(counts[i], _poisson)
-                current_island = [_bin, bins[i] + bin_size - 1, count, 0, score, 0, 0]
-                break
+        count = counts[0]
+        _bin = bins[0]
+        score = compute_window_score(count, _poisson)
+        # for i in range(len(bins)):
+        #     count = counts[i]
+        #     if not (count < island_enriched_threshold):
+        #         j = i + 1
+        #         _bin = bins[i]
+        #         score = compute_window_score(counts[i], _poisson)
+        #         current_island = [_bin, bins[i] + bin_size - 1, count, 0, score, 0, 0]
+        #         break
 
         # no bins above threshold found
-        if j == 4294967295:
-            continue
+        # if j == 4294967295:
+        #     continue
 
-        for i in range(j, len(bins)):
+        current_island = [_bin, _bin + bin_size - 1, count, 0, score, 0, 0]
+        for i in range(1, len(bins)):
 
             count = counts[i]
-
-            if count < island_enriched_threshold:
-                continue
 
             _bin = bins[i]
 
@@ -123,7 +124,7 @@ def find_islands(bins_counts, int gaps_allowed, int bin_size, float score_thresh
                 current_island.chip_count += counts[i]
                 current_island.score += compute_window_score(counts[i], _poisson)
             else:
-                if current_island.score > slightly_less:
+                if current_island.score > slightly_less and current_island.chip_count > island_enriched_threshold:
                     v.push_back(current_island)
 
                 score = compute_window_score(counts[i], _poisson)
@@ -165,12 +166,17 @@ def compute_fdr(islands, b_bins_counts, int chip_library_size, int control_libra
         int num_islands
         int counter
 
+    print("chip_library_size", chip_library_size)
+    print("control_library_size", control_library_size)
     sf = poisson.sf
     chromosomes = natsorted(set(islands.keys()))
-    num_islands_per_chrom = [len(v) for v in islands.values()]
+    num_islands_per_chrom = [len(v) for _, v in natsorted(islands.items())]
+    print("scaling_factor", scaling_factor)
+    print("zero_scaler", zero_scaler)
     for chromosome in chromosomes:
         j = 0
         _islands = islands[chromosome]
+        print("chr", chromosome, len(_islands), _islands)
 
         if chromosome not in b_bins_counts:
             continue
@@ -196,16 +202,19 @@ def compute_fdr(islands, b_bins_counts, int chip_library_size, int control_libra
             if _island.input_count > 0:
                 average = _island.input_count * scaling_factor
             else:
-                average = (_island.end - _island.start) * zero_scaler
-                average = min(0.25, average)
+                average = (_island.end - _island.start + 1) * zero_scaler
+                average = min(0.25, average) * scaling_factor
 
             _island.fold_change = _island.chip_count / average
 
             if _island.chip_count > average:
-
                 _island.p_value = sf(_island.chip_count, average)
             else:
                 _island.p_value = 1
+
+            # if chromosome == "chrX":
+            #     print("average", average)
+            #     print(_island)
 
             all_islands.push_back(_island)
 
@@ -221,12 +230,14 @@ def compute_fdr(islands, b_bins_counts, int chip_library_size, int control_libra
     num_islands = len(all_islands)
 
     for chromosome, chromosome_size in zip(chromosomes, num_islands_per_chrom):
+        print("chr, size", chromosome, chromosome_size)
 
+        i = 0
         for i in range(chromosome_size):
 
             #### compute fdr #####
-            _island = all_islands.wrapped_vector[i]
-            fdr = _island.p_value * num_islands / ranks[i]
+            _island = all_islands.wrapped_vector[i + counter]
+            fdr = _island.p_value * num_islands / ranks[i + counter]
             if fdr > 1:
                 fdr = 1
 
