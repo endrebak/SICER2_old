@@ -1,4 +1,9 @@
 from collections import defaultdict
+from cython.operator import dereference, postincrement
+
+
+
+cimport cpp_read_files as cr
 
 import sys
 import numpy as np
@@ -12,6 +17,7 @@ from libcpp.map cimport map as cppmap
 from libcpp.algorithm cimport unique
 from libcpp.vector cimport vector
 from libcpp.string cimport string
+from libcpp.map cimport map
 
 cdef extern from "<algorithm>" namespace "std" nogil:
     OutputIter merge[InputIter1, InputIter2, OutputIter] (InputIter1 first1, InputIter1 last1,
@@ -174,18 +180,42 @@ cpdef files_to_bin_counts(files, args):
         uint32_t half_fragment_size = args["fragment_size"] / 2
         Vector32 v
         Vector32 v2
-        cdef long[::1] bin_arr
+        long[::1] bin_arr
+        bytes py_bytes
+        char* c_string
+        cr.genome_map cpp_tags
+        map[cr.key, cr.intvec].iterator it
 
 
     sum_tags = defaultdict(list)
     sys.stderr.write("Parsing file:\n")
     sys.stderr.flush()
+    tags = dict()
     for f in files:
 
         sys.stderr.write("  " + f + "\n")
         sys.stderr.flush()
 
-        tags = add_reads_to_dict(f, set(args["chromsizes"].keys()))
+        py_bytes = f.encode()
+        c_string = py_bytes
+        cpp_tags = cr.read_bed(c_string) # add_reads_to_dict(f, set(args["chromsizes"].keys()))
+
+        it = cpp_tags.begin();
+
+        while (it != cpp_tags.end()):
+            chromosome = dereference(it).first.first.decode()
+
+            if chromosome not in args["chromsizes"].keys():
+                postincrement(it)
+                continue
+
+            strand = chr(dereference(it).first.second)
+
+            v = Vector32()
+            v.wrapped_vector = dereference(it).second
+            tags[chromosome, strand] = v
+
+            postincrement(it)
 
         for v in tags.values():
             v.sort()

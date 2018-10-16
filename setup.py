@@ -6,7 +6,7 @@ from distutils.core import setup
 from setuptools import find_packages, Extension, Command
 from Cython.Build import cythonize
 
-compile_options = ["-Ofast", "-Wall"] #, "-frename-registers", "-funroll-loops"] #
+compile_options = ["-Ofast", "-Wall", "-std=c++11"] #, "-frename-registers", "-funroll-loops"] #
                    # -fprofile-generate
                    #"-fopenmp", "-D_GLIBCXX_PARALLEL"]
 

@@ -97,18 +97,6 @@ def find_islands(bins_counts, int gaps_allowed, int bin_size, float score_thresh
         count = counts[0]
         _bin = bins[0]
         score = compute_window_score(count, _poisson)
-        # for i in range(len(bins)):
-        #     count = counts[i]
-        #     if not (count < island_enriched_threshold):
-        #         j = i + 1
-        #         _bin = bins[i]
-        #         score = compute_window_score(counts[i], _poisson)
-        #         current_island = [_bin, bins[i] + bin_size - 1, count, 0, score, 0, 0]
-        #         break
-
-        # no bins above threshold found
-        # if j == 4294967295:
-        #     continue
 
         current_island = [_bin, _bin + bin_size - 1, count, 0, score, 0, 0]
         for i in range(1, len(bins)):
@@ -159,15 +147,16 @@ def compute_fdr(islands, b_bins_counts, int chip_library_size, int control_libra
         uint32_t _bin
         uint32_t[::1] bins = np.ones(1, dtype=np.uint32)
         uint16_t[::1] counts = np.ones(1, dtype=np.uint16)
-        float scaling_factor = chip_library_size / control_library_size
+        float scaling_factor = float(chip_library_size) / float(control_library_size)
         float zero_scaler = (control_library_size / effective_genome_fraction)
         float fdr
         float average
         int num_islands
         int counter
 
-    # print("chip_library_size", chip_library_size)
-    # print("control_library_size", control_library_size)
+    print("chip_library_size", chip_library_size)
+    print("control_library_size", control_library_size)
+    print("float(chip_library_size) / float(control_library_size)", float(chip_library_size) / float(control_library_size))
     sf = poisson.sf
     chromosomes = natsorted(set(islands.keys()))
     num_islands_per_chrom = [len(v) for _, v in natsorted(islands.items())]
