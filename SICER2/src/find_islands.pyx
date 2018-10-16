@@ -166,8 +166,8 @@ def compute_fdr(islands, b_bins_counts, int chip_library_size, int control_libra
         int num_islands
         int counter
 
-    print("chip_library_size", chip_library_size)
-    print("control_library_size", control_library_size)
+    # print("chip_library_size", chip_library_size)
+    # print("control_library_size", control_library_size)
     sf = poisson.sf
     chromosomes = natsorted(set(islands.keys()))
     num_islands_per_chrom = [len(v) for _, v in natsorted(islands.items())]
@@ -176,7 +176,7 @@ def compute_fdr(islands, b_bins_counts, int chip_library_size, int control_libra
     for chromosome in chromosomes:
         j = 0
         _islands = islands[chromosome]
-        print("chr", chromosome, len(_islands), _islands)
+        # print("chr", chromosome, len(_islands), _islands)
 
         if chromosome not in b_bins_counts:
             continue
@@ -230,7 +230,7 @@ def compute_fdr(islands, b_bins_counts, int chip_library_size, int control_libra
     num_islands = len(all_islands)
 
     for chromosome, chromosome_size in zip(chromosomes, num_islands_per_chrom):
-        print("chr, size", chromosome, chromosome_size)
+        # print("chr, size", chromosome, chromosome_size)
 
         i = 0
         for i in range(chromosome_size):
